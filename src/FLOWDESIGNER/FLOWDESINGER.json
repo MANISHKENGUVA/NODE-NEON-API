@@ -1,0 +1,490 @@
+{
+    "workflowVersion": "LOAN-FLOW-V5",
+    "startState": "BORROWER-DETAILS-V1-PERSONAL-INFO-V1",
+  
+    "states": {
+  
+      "BORROWER-DETAILS-V1-PERSONAL-INFO-V1": {
+        "type": "FORM",
+        "component": "PersonalInfoPage",
+  
+        "metadata": {
+          "actor": "BORROWER",
+          "module": "DETAILS",
+          "moduleVersion": "V1",
+          "node": "PERSONAL-INFO",
+          "nodeVersion": "V1"
+        },
+  
+        "edges": {
+          "ED01": {
+            "toState": "BORROWER-ADDRESS-V1-ADDRESS-INFO-V1",
+  
+            "ruleEngine": {
+              "type": "AND",
+              "conditions": [
+                {
+                  "field": "APPLICATION.currentStep",
+                  "operator": "=",
+                  "value": "PERSONAL_INFO_COMPLETED"
+                },
+                {
+                  "field": "PERSONALDETAILS.basicInfoCompleted",
+                  "operator": "=",
+                  "value": true
+                }
+              ]
+            }
+          }
+        }
+      },
+  
+      "BORROWER-ADDRESS-V1-ADDRESS-INFO-V1": {
+        "type": "FORM",
+        "component": "AddressInfoPage",
+  
+        "metadata": {
+          "actor": "BORROWER",
+          "module": "ADDRESS",
+          "moduleVersion": "V1",
+          "node": "ADDRESS-INFO",
+          "nodeVersion": "V1"
+        },
+  
+        "edges": {
+          "ED02": {
+            "toState": "BORROWER-KYC-V1-KYC-UPLOAD-V1",
+  
+            "ruleEngine": {
+              "type": "AND",
+              "conditions": [
+                {
+                  "field": "ADDRESS.current.isValid",
+                  "operator": "=",
+                  "value": true
+                },
+                {
+                  "field": "ADDRESS.current.pincodeVerified",
+                  "operator": "=",
+                  "value": true
+                }
+              ]
+            }
+          }
+        }
+      },
+  
+      "BORROWER-KYC-V1-KYC-UPLOAD-V1": {
+        "type": "FORM",
+        "component": "KYCUploadPage",
+  
+        "metadata": {
+          "actor": "BORROWER",
+          "module": "KYC",
+          "moduleVersion": "V1",
+          "node": "KYC-UPLOAD",
+          "nodeVersion": "V1"
+        },
+  
+        "edges": {
+  
+          "ED03": {
+            "toState": "BORROWER-KYC-V1-FACE-VERIFICATION-V1",
+  
+            "ruleEngine": {
+              "type": "AND",
+              "conditions": [
+                {
+                  "field": "DOCUMENTS.identity.aadharUploaded",
+                  "operator": "=",
+                  "value": true
+                },
+                {
+                  "field": "DOCUMENTS.identity.panUploaded",
+                  "operator": "=",
+                  "value": true
+                }
+              ]
+            }
+          },
+  
+          "ED04": {
+            "toState": "APPLICATION-STATUS-V1-REJECTED-V1",
+  
+            "ruleEngine": {
+              "type": "OR",
+              "conditions": [
+                {
+                  "field": "DOCUMENTS.identity.aadharUploaded",
+                  "operator": "=",
+                  "value": false
+                },
+                {
+                  "field": "DOCUMENTS.identity.panUploaded",
+                  "operator": "=",
+                  "value": false
+                }
+              ]
+            }
+          }
+        }
+      },
+  
+      "BORROWER-KYC-V1-FACE-VERIFICATION-V1": {
+        "type": "SYSTEM",
+        "component": "FaceVerificationEngine",
+  
+        "metadata": {
+          "actor": "BORROWER",
+          "module": "KYC",
+          "moduleVersion": "V1",
+          "node": "FACE-VERIFICATION",
+          "nodeVersion": "V1"
+        },
+  
+        "edges": {
+  
+          "ED05": {
+            "toState": "BORROWER-KYC-V1-PAN-VERIFICATION-V1",
+  
+            "ruleEngine": {
+              "type": "AND",
+              "conditions": [
+                {
+                  "field": "KYC.faceVerification.matchScore",
+                  "operator": ">=",
+                  "value": 80
+                },
+                {
+                  "field": "KYC.faceVerification.livenessPassed",
+                  "operator": "=",
+                  "value": true
+                }
+              ]
+            }
+          },
+  
+          "ED06": {
+            "toState": "MANAGER-APPROVAL-V1-FINAL-APPROVAL-V1",
+  
+            "ruleEngine": {
+              "type": "OR",
+              "conditions": [
+                {
+                  "field": "KYC.faceVerification.matchScore",
+                  "operator": "<",
+                  "value": 80
+                },
+                {
+                  "field": "KYC.faceVerification.livenessPassed",
+                  "operator": "=",
+                  "value": false
+                }
+              ]
+            }
+          }
+        }
+      },
+  
+      "BORROWER-KYC-V1-PAN-VERIFICATION-V1": {
+        "type": "SYSTEM",
+        "component": "PANVerificationEngine",
+  
+        "metadata": {
+          "actor": "BORROWER",
+          "module": "KYC",
+          "moduleVersion": "V1",
+          "node": "PAN-VERIFICATION",
+          "nodeVersion": "V1"
+        },
+  
+        "edges": {
+  
+          "ED07": {
+            "toState": "BORROWER-KYC-V1-AADHAR-VERIFICATION-V1",
+  
+            "ruleEngine": {
+              "type": "AND",
+              "conditions": [
+                {
+                  "field": "KYC.pan.status",
+                  "operator": "=",
+                  "value": "VERIFIED"
+                },
+                {
+                  "field": "KYC.pan.nameMatched",
+                  "operator": "=",
+                  "value": true
+                }
+              ]
+            }
+          },
+  
+          "ED08": {
+            "toState": "APPLICATION-STATUS-V1-REJECTED-V1",
+  
+            "ruleEngine": {
+              "type": "OR",
+              "conditions": [
+                {
+                  "field": "KYC.pan.status",
+                  "operator": "=",
+                  "value": "FAILED"
+                },
+                {
+                  "field": "KYC.pan.blacklisted",
+                  "operator": "=",
+                  "value": true
+                }
+              ]
+            }
+          }
+        }
+      },
+  
+      "BORROWER-KYC-V1-AADHAR-VERIFICATION-V1": {
+        "type": "SYSTEM",
+        "component": "AadharVerificationEngine",
+  
+        "metadata": {
+          "actor": "BORROWER",
+          "module": "KYC",
+          "moduleVersion": "V1",
+          "node": "AADHAR-VERIFICATION",
+          "nodeVersion": "V1"
+        },
+  
+        "edges": {
+  
+          "ED09": {
+            "toState": "BORROWER-EMPLOYMENT-V1-EMPLOYMENT-INFO-V1",
+  
+            "ruleEngine": {
+              "type": "AND",
+              "conditions": [
+                {
+                  "field": "KYC.aadhar.status",
+                  "operator": "=",
+                  "value": "VERIFIED"
+                },
+                {
+                  "field": "KYC.aadhar.mobileLinked",
+                  "operator": "=",
+                  "value": true
+                }
+              ]
+            }
+          },
+  
+          "ED10": {
+            "toState": "APPLICATION-STATUS-V1-REJECTED-V1",
+  
+            "ruleEngine": {
+              "type": "OR",
+              "conditions": [
+                {
+                  "field": "KYC.aadhar.status",
+                  "operator": "=",
+                  "value": "FAILED"
+                },
+                {
+                  "field": "KYC.aadhar.mobileLinked",
+                  "operator": "=",
+                  "value": false
+                }
+              ]
+            }
+          }
+        }
+      },
+  
+      "BORROWER-EMPLOYMENT-V1-EMPLOYMENT-INFO-V1": {
+        "type": "FORM",
+        "component": "EmploymentInfoPage",
+  
+        "metadata": {
+          "actor": "BORROWER",
+          "module": "EMPLOYMENT",
+          "moduleVersion": "V1",
+          "node": "EMPLOYMENT-INFO",
+          "nodeVersion": "V1"
+        },
+  
+        "edges": {
+  
+          "ED11": {
+            "toState": "BORROWER-SALARY-V1-SALARY-INFO-V1",
+  
+            "ruleEngine": {
+              "type": "AND",
+              "conditions": [
+                {
+                  "field": "PERSONALDETAILS.financialStatus.employmentType",
+                  "operator": "=",
+                  "value": "EMPLOYED"
+                },
+                {
+                  "field": "EMPLOYMENT.currentCompany.isActive",
+                  "operator": "=",
+                  "value": true
+                }
+              ]
+            }
+          },
+  
+          "ED12": {
+            "toState": "BORROWER-BUSINESS-V1-BUSINESS-INFO-V1",
+  
+            "ruleEngine": {
+              "type": "AND",
+              "conditions": [
+                {
+                  "field": "PERSONALDETAILS.financialStatus.employmentType",
+                  "operator": "=",
+                  "value": "BUSINESS_OWNER"
+                },
+                {
+                  "field": "BUSINESS.registration.exists",
+                  "operator": "=",
+                  "value": true
+                }
+              ]
+            }
+          },
+  
+          "ED13": {
+            "toState": "APPLICATION-STATUS-V1-REJECTED-V1",
+  
+            "ruleEngine": {
+              "type": "OR",
+              "conditions": [
+                {
+                  "field": "PERSONALDETAILS.financialStatus.employmentType",
+                  "operator": "=",
+                  "value": "UNEMPLOYED"
+                },
+                {
+                  "field": "PERSONALDETAILS.financialStatus.blacklistedEmployer",
+                  "operator": "=",
+                  "value": true
+                }
+              ]
+            }
+          }
+        }
+      },
+  
+      "BORROWER-SALARY-V1-SALARY-INFO-V1": {
+        "type": "FORM",
+        "component": "SalaryInfoPage",
+  
+        "metadata": {
+          "actor": "BORROWER",
+          "module": "SALARY",
+          "moduleVersion": "V1",
+          "node": "SALARY-INFO",
+          "nodeVersion": "V1"
+        },
+  
+        "edges": {
+  
+          "ED14": {
+            "toState": "BORROWER-BANK-V1-BANK-DETAILS-V1",
+  
+            "ruleEngine": {
+              "type": "AND",
+              "conditions": [
+                {
+                  "field": "EMPLOYMENT.salary.monthlyIncome",
+                  "operator": ">=",
+                  "value": 50000
+                },
+                {
+                  "field": "EMPLOYMENT.salary.companyVerified",
+                  "operator": "=",
+                  "value": true
+                }
+              ]
+            }
+          },
+  
+          "ED15": {
+            "toState": "COBORROWER-KYC-V1-KYC-UPLOAD-V1",
+  
+            "ruleEngine": {
+              "type": "OR",
+              "conditions": [
+                {
+                  "field": "EMPLOYMENT.salary.monthlyIncome",
+                  "operator": "<",
+                  "value": 50000
+                },
+                {
+                  "field": "FINANCIALDETAILS.creditData.creditScore",
+                  "operator": "<",
+                  "value": 650
+                }
+              ]
+            }
+          }
+        }
+      },
+  
+      "BORROWER-BUSINESS-V1-BUSINESS-INFO-V1": {
+        "type": "FORM",
+        "component": "BusinessInfoPage",
+  
+        "metadata": {
+          "actor": "BORROWER",
+          "module": "BUSINESS",
+          "moduleVersion": "V1",
+          "node": "BUSINESS-INFO",
+          "nodeVersion": "V1"
+        },
+  
+        "edges": {
+  
+          "ED16": {
+            "toState": "BORROWER-BANK-V1-BANK-DETAILS-V1",
+  
+            "ruleEngine": {
+              "type": "AND",
+              "conditions": [
+                {
+                  "field": "BUSINESS.financials.annualRevenue",
+                  "operator": ">",
+                  "value": 1000000
+                },
+                {
+                  "field": "BUSINESS.registration.isVerified",
+                  "operator": "=",
+                  "value": true
+                }
+              ]
+            }
+          },
+  
+          "ED17": {
+            "toState": "APPLICATION-STATUS-V1-REJECTED-V1",
+  
+            "ruleEngine": {
+              "type": "OR",
+              "conditions": [
+                {
+                  "field": "BUSINESS.registration.isVerified",
+                  "operator": "=",
+                  "value": false
+                },
+                {
+                  "field": "BUSINESS.financials.annualRevenue",
+                  "operator": "<",
+                  "value": 500000
+                }
+              ]
+            }
+          }
+        }
+      }
+  
+    }
+  }

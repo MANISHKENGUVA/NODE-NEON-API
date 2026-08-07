@@ -1,0 +1,20 @@
+{
+  "name": "node-neon-api",
+  "version": "1.0.0",
+  "description": "Node.js API with Neon PostgreSQL, CORS, and middleware",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js"
+  },
+  "keywords": ["express", "neon", "postgresql", "api"],
+  "license": "MIT",
+  "dependencies": {
+    "@neondatabase/serverless": "^0.10.4",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "helmet": "^8.0.0",
+    "morgan": "^1.10.0"
+  }
+}
