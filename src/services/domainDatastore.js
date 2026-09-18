@@ -84,13 +84,17 @@ async function callDynamic_eventype_db_storage_ADDRESS_INFO_SUBMITTED(workflowId
   const patch = {
     ADDRESS: {
       current: {
-        addressLine1:    formData.addressLine1,
-        addressLine2:    formData.addressLine2,
-        city:            formData.city,
-        state:           formData.state,
-        pincode:         formData.pincode,
-        country:         formData.country || "INDIA",
-        addressType:     formData.addressType,
+        flatNo:                        formData.flatNo,
+        building:                      formData.building,
+        street:                        formData.street,
+        landmark:                      formData.landmark,
+        city:                          formData.city,
+        district:                      formData.district,
+        state:                         formData.state,
+        pincode:                       formData.pincode,
+        country:                       formData.country || "INDIA",
+        residenceType:                 formData.residenceType,
+        permanentAddressSameAsCurrent: formData.permanentAddressSameAsCurrent ?? false,
         // computed flags
         isValid:         true,
         pincodeVerified: true,
@@ -177,21 +181,348 @@ async function callDynamic_eventype_db_storage_BUSINESS_INFO_SUBMITTED(workflowI
   return upsertAllDomains(workflowId, patch);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// upsertAllDomains — merges a multi-domain patch object into the single row
+async function callDynamic_eventype_db_storage_FACE_VERIFICATION_SUBMITTED(workflowId, formData) {
+  // Both matchScore and livenessPassed are null — verification result not yet determined
+  const patch = {
+    KYC: {
+      faceVerification: {
+        matchScore:     null,
+        livenessPassed: null,
+        status:         "PENDING",
+      },
+    },
+    APPLICATION: {
+      currentStep: "FACE_VERIFICATION_COMPLETED",
+    },
+  };
+
+  return upsertAllDomains(workflowId, patch);
+}
+
+async function callDynamic_eventype_db_storage_FACE_VERIFICATION_RESULT_SUBMITTED(workflowId, formData) {
+  // Called when the face verification engine returns actual results
+  const matchScore    = Number(formData.matchScore);
+  const livenessPassed = formData.livenessPassed === true || formData.livenessPassed === "true";
+  const passed         = matchScore >= 80 && livenessPassed;
+
+  const patch = {
+    KYC: {
+      faceVerification: {
+        matchScore,
+        livenessPassed,
+        status: passed ? "VERIFIED" : "FAILED",
+      },
+    },
+    APPLICATION: {
+      currentStep: "FACE_VERIFICATION_RESULT_RECEIVED",
+    },
+  };
+
+  return upsertAllDomains(workflowId, patch);
+}
+
+async function callDynamic_eventype_db_storage_PAN_VERIFICATION_SUBMITTED(workflowId, formData) {
+  const isVerified = formData.status === "VERIFIED" || formData.status === undefined || formData.status === true;
+  const patch = {
+    KYC: {
+      pan: {
+        status:      isVerified ? "VERIFIED" : (formData.status || "FAILED"),
+        nameMatched: formData.nameMatched !== false,
+        blacklisted: formData.blacklisted === true,
+        panNumber:   formData.panNumber || null,
+      },
+    },
+    APPLICATION: {
+      currentStep: "PAN_VERIFICATION_COMPLETED",
+    },
+  };
+  return upsertAllDomains(workflowId, patch);
+}
+
+async function callDynamic_eventype_db_storage_AADHAR_VERIFICATION_SUBMITTED(workflowId, formData) {
+  const isVerified = formData.status === "VERIFIED" || formData.status === undefined || formData.status === true;
+  const patch = {
+    KYC: {
+      aadhar: {
+        status:       isVerified ? "VERIFIED" : (formData.status || "FAILED"),
+        mobileLinked: formData.mobileLinked !== false,
+        aadharNumber: formData.aadharNumber || null,
+      },
+    },
+    APPLICATION: {
+      currentStep: "AADHAR_VERIFICATION_COMPLETED",
+    },
+  };
+  return upsertAllDomains(workflowId, patch);
+}
+
+async function callDynamic_eventype_db_storage_BANK_DETAILS_SUBMITTED(workflowId, formData) {
+  const patch = {
+    BANK: {
+      accountNumber: {
+        number: formData.accountNumber || formData.account_number || null,
+        valid:  formData.accountNumberValid !== false,
+      },
+      ifsc: {
+        code:  formData.ifsc || formData.ifscCode || null,
+        valid: formData.ifscValid !== false,
+      },
+      accountHolderName: formData.accountHolderName || null,
+      bankName:          formData.bankName || null,
+      branch:            formData.branch || null,
+    },
+    APPLICATION: {
+      currentStep: "BANK_DETAILS_COMPLETED",
+    },
+  };
+  return upsertAllDomains(workflowId, patch);
+}
+
+async function callDynamic_eventype_db_storage_BANK_ACCOUNT_VERIFICATION_SUBMITTED(workflowId, formData) {
+  const isVerified = formData.status === "VERIFIED" || formData.status === undefined || formData.status === true;
+  const patch = {
+    BANK: {
+      verification: {
+        status:     isVerified ? "VERIFIED" : (formData.status || "FAILED"),
+        verifiedAt: new Date().toISOString(),
+      },
+    },
+    APPLICATION: {
+      currentStep: "BANK_ACCOUNT_VERIFICATION_COMPLETED",
+    },
+  };
+  return upsertAllDomains(workflowId, patch);
+}
+
+async function callDynamic_eventype_db_storage_BANK_STATEMENT_UPLOAD_SUBMITTED(workflowId, formData) {
+  const patch = {
+    DOCUMENTS: {
+      bankStatement: {
+        uploaded: formData.uploaded !== false,
+        valid:    formData.valid !== false,
+        fileUrl:  formData.fileUrl || null,
+      },
+    },
+    APPLICATION: {
+      currentStep: "BANK_STATEMENT_UPLOAD_COMPLETED",
+    },
+  };
+  return upsertAllDomains(workflowId, patch);
+}
+
+async function callDynamic_eventype_db_storage_DOCUMENT_UPLOAD_SUBMITTED(workflowId, formData) {
+  const patch = {
+    DOCUMENTS: {
+      requiredDocuments: {
+        completed: formData.completed !== false,
+        invalid:   formData.invalid === true,
+      },
+    },
+    APPLICATION: {
+      currentStep: "DOCUMENT_UPLOAD_COMPLETED",
+    },
+  };
+  return upsertAllDomains(workflowId, patch);
+}
+
+async function callDynamic_eventype_db_storage_LOAN_CONSENT_SUBMITTED(workflowId, formData) {
+  const requiresCoborrower = formData.requiresCoborrower === true || formData.requiresCoborrower === "true";
+  const patch = {
+    CONSENT: {
+      borrowerConsent: formData.borrowerConsent !== false,
+      consentedAt:     new Date().toISOString(),
+    },
+    APPLICATION: {
+      currentStep:        "LOAN_CONSENT_COMPLETED",
+      requiresCoborrower: requiresCoborrower,
+    },
+  };
+  return upsertAllDomains(workflowId, patch);
+}
+
+
+async function callDynamic_eventype_db_storage_FRAUD_CHECK_SUBMITTED(workflowId, formData) {
+  const patch = {
+    FRAUDCHECK: {
+      status:     formData.status,
+      checkedAt:  new Date().toISOString(),
+      remarks:    formData.remarks || null,
+    },
+    APPLICATION: {
+      currentStep: "FRAUD_CHECK_COMPLETED",
+    },
+  };
+
+  return upsertAllDomains(workflowId, patch);
+}
+
+async function callDynamic_eventype_db_storage_MANAGER_CREDIT_EXCEPTION_SUBMITTED(workflowId, formData) {
+  const patch = {
+    MANAGER: {
+      creditException: {
+        decision:   formData.decision,
+        reviewedAt: new Date().toISOString(),
+        remarks:    formData.remarks || null,
+      },
+    },
+    APPLICATION: {
+      currentStep: "MANAGER_CREDIT_EXCEPTION_COMPLETED",
+    },
+  };
+  return upsertAllDomains(workflowId, patch);
+}
+
+async function callDynamic_eventype_db_storage_MANAGER_FRAUD_REVIEW_SUBMITTED(workflowId, formData) {
+  const patch = {
+    MANAGER: {
+      fraudReview: {
+        decision:   formData.decision,
+        reviewedAt: new Date().toISOString(),
+        remarks:    formData.remarks || null,
+      },
+    },
+    APPLICATION: {
+      currentStep: "MANAGER_FRAUD_REVIEW_COMPLETED",
+    },
+  };
+  return upsertAllDomains(workflowId, patch);
+}
+
+async function callDynamic_eventype_db_storage_MANAGER_DOCUMENT_REVIEW_SUBMITTED(workflowId, formData) {
+  const patch = {
+    MANAGER: {
+      documentReview: {
+        decision:   formData.decision,
+        reviewedAt: new Date().toISOString(),
+        remarks:    formData.remarks || null,
+      },
+    },
+    APPLICATION: {
+      currentStep: "MANAGER_DOCUMENT_REVIEW_COMPLETED",
+    },
+  };
+  return upsertAllDomains(workflowId, patch);
+}
+
+async function callDynamic_eventype_db_storage_MANAGER_RISK_REVIEW_SUBMITTED(workflowId, formData) {
+  const patch = {
+    MANAGER: {
+      riskReview: {
+        decision:   formData.decision,
+        reviewedAt: new Date().toISOString(),
+        remarks:    formData.remarks || null,
+      },
+    },
+    APPLICATION: {
+      currentStep: "MANAGER_RISK_REVIEW_COMPLETED",
+    },
+  };
+  return upsertAllDomains(workflowId, patch);
+}
+
+async function callDynamic_eventype_db_storage_MANAGER_ELIGIBILITY_REVIEW_SUBMITTED(workflowId, formData) {
+  const patch = {
+    MANAGER: {
+      eligibilityReview: {
+        decision:   formData.decision,
+        reviewedAt: new Date().toISOString(),
+        remarks:    formData.remarks || null,
+      },
+    },
+    APPLICATION: {
+      currentStep: "MANAGER_ELIGIBILITY_REVIEW_COMPLETED",
+    },
+  };
+  return upsertAllDomains(workflowId, patch);
+}
+
+async function callDynamic_eventype_db_storage_MANAGER_FINAL_APPROVAL_SUBMITTED(workflowId, formData) {
+  const patch = {
+    MANAGER: {
+      finalApproval: {
+        decision:   formData.decision,
+        approvedAt: new Date().toISOString(),
+        remarks:    formData.remarks || null,
+      },
+    },
+    APPLICATION: {
+      currentStep: "MANAGER_FINAL_APPROVAL_COMPLETED",
+    },
+  };
+  return upsertAllDomains(workflowId, patch);
+}
+
+async function callDynamic_eventype_db_storage_MANAGER_DISBURSEMENT_REVIEW_SUBMITTED(workflowId, formData) {
+  const patch = {
+    MANAGER: {
+      disbursementReview: {
+        decision:   formData.decision,
+        reviewedAt: new Date().toISOString(),
+        remarks:    formData.remarks || null,
+      },
+    },
+    APPLICATION: {
+      currentStep: "MANAGER_DISBURSEMENT_REVIEW_COMPLETED",
+    },
+  };
+  return upsertAllDomains(workflowId, patch);
+}
+
+async function callDynamic_eventype_db_storage_MANAGER_APPROVAL_SUBMITTED(workflowId, formData) {
+  const patch = {
+    APPROVAL: {
+      managerDecision: formData.approvalDecision || formData.approvalStatus,
+      approvedAt:      new Date().toISOString(),
+    },
+    APPLICATION: {
+      currentStep: "MANAGER_APPROVAL_COMPLETED",
+    },
+  };
+
+  return upsertAllDomains(workflowId, patch);
+}
+
+function deepMerge(target, source) {
+  if (!target || typeof target !== "object") return source;
+  if (!source || typeof source !== "object") return target;
+
+  const result = { ...target };
+  for (const key of Object.keys(source)) {
+    if (
+      source[key] &&
+      typeof source[key] === "object" &&
+      !Array.isArray(source[key]) &&
+      result[key] &&
+      typeof result[key] === "object" &&
+      !Array.isArray(result[key])
+    ) {
+      result[key] = deepMerge(result[key], source[key]);
+    } else {
+      result[key] = source[key];
+    }
+  }
+  return result;
+}
+
 // patch shape: { PERSONALDETAILS: {...}, APPLICATION: {...} }
 // ─────────────────────────────────────────────────────────────────────────────
 async function upsertAllDomains(workflowId, patch) {
   console.log(`[domainDatastore] upsertAllDomains workflowId=${workflowId} domains=${Object.keys(patch).join(', ')}`);
 
-  const patchStr = JSON.stringify(patch);
+  // Fetch current stored data to perform deep merge (prevents nested keys like KYC.pan being wiped by KYC.aadhar)
+  const existingRows = await sql`
+    SELECT data FROM domain_datastore WHERE workflow_id = ${workflowId} LIMIT 1
+  `;
+  const existingData = existingRows[0]?.data || {};
+  const mergedData = deepMerge(existingData, patch);
+  const dataStr = JSON.stringify(mergedData);
 
   const [record] = await sql`
     INSERT INTO domain_datastore (workflow_id, data)
-    VALUES (${workflowId}, ${patchStr}::jsonb)
+    VALUES (${workflowId}, ${dataStr}::jsonb)
     ON CONFLICT (workflow_id)
     DO UPDATE SET
-      data       = domain_datastore.data || ${patchStr}::jsonb,
+      data       = ${dataStr}::jsonb,
       updated_at = NOW()
     RETURNING *
   `;
@@ -204,12 +535,31 @@ async function upsertAllDomains(workflowId, patch) {
 // Dispatcher
 // ─────────────────────────────────────────────────────────────────────────────
 const EVENTYPE_HANDLER_MAP = {
-  PERSONAL_INFO_SUBMITTED:    callDynamic_eventype_db_storage_PERSONAL_INFO_SUBMITTED,
-  ADDRESS_INFO_SUBMITTED:     callDynamic_eventype_db_storage_ADDRESS_INFO_SUBMITTED,
-  KYC_UPLOAD_SUBMITTED:       callDynamic_eventype_db_storage_KYC_UPLOAD_SUBMITTED,
-  EMPLOYMENT_INFO_SUBMITTED:  callDynamic_eventype_db_storage_EMPLOYMENT_INFO_SUBMITTED,
-  SALARY_INFO_SUBMITTED:      callDynamic_eventype_db_storage_SALARY_INFO_SUBMITTED,
-  BUSINESS_INFO_SUBMITTED:    callDynamic_eventype_db_storage_BUSINESS_INFO_SUBMITTED,
+  PERSONAL_INFO_SUBMITTED:         callDynamic_eventype_db_storage_PERSONAL_INFO_SUBMITTED,
+  ADDRESS_INFO_SUBMITTED:          callDynamic_eventype_db_storage_ADDRESS_INFO_SUBMITTED,
+  KYC_UPLOAD_SUBMITTED:            callDynamic_eventype_db_storage_KYC_UPLOAD_SUBMITTED,
+  FACE_VERIFICATION_SUBMITTED:        callDynamic_eventype_db_storage_FACE_VERIFICATION_SUBMITTED,
+  FACE_VERIFICATION_RESULT_SUBMITTED:  callDynamic_eventype_db_storage_FACE_VERIFICATION_RESULT_SUBMITTED,
+  PAN_VERIFICATION_SUBMITTED:          callDynamic_eventype_db_storage_PAN_VERIFICATION_SUBMITTED,
+  AADHAR_VERIFICATION_SUBMITTED:       callDynamic_eventype_db_storage_AADHAR_VERIFICATION_SUBMITTED,
+  BANK_DETAILS_SUBMITTED:              callDynamic_eventype_db_storage_BANK_DETAILS_SUBMITTED,
+  BANK_ACCOUNT_VERIFICATION_SUBMITTED: callDynamic_eventype_db_storage_BANK_ACCOUNT_VERIFICATION_SUBMITTED,
+  BANK_ACCOUNT_VERIFIED:               callDynamic_eventype_db_storage_BANK_ACCOUNT_VERIFICATION_SUBMITTED,
+  BANK_VERIFICATION_SUBMITTED:         callDynamic_eventype_db_storage_BANK_ACCOUNT_VERIFICATION_SUBMITTED,
+  BANK_STATEMENT_UPLOAD_SUBMITTED:     callDynamic_eventype_db_storage_BANK_STATEMENT_UPLOAD_SUBMITTED,
+  BANK_STATEMENT_UPLOADED:             callDynamic_eventype_db_storage_BANK_STATEMENT_UPLOAD_SUBMITTED,
+  BANK_STATEMENT_SUBMITTED:            callDynamic_eventype_db_storage_BANK_STATEMENT_UPLOAD_SUBMITTED,
+  DOCUMENT_UPLOAD_SUBMITTED:           callDynamic_eventype_db_storage_DOCUMENT_UPLOAD_SUBMITTED,
+  DOCUMENT_UPLOADED:                   callDynamic_eventype_db_storage_DOCUMENT_UPLOAD_SUBMITTED,
+  DOCUMENTS_UPLOAD_SUBMITTED:          callDynamic_eventype_db_storage_DOCUMENT_UPLOAD_SUBMITTED,
+  DOCUMENTS_SUBMITTED:                 callDynamic_eventype_db_storage_DOCUMENT_UPLOAD_SUBMITTED,
+  LOAN_CONSENT_SUBMITTED:              callDynamic_eventype_db_storage_LOAN_CONSENT_SUBMITTED,
+  CONSENT_SUBMITTED:                   callDynamic_eventype_db_storage_LOAN_CONSENT_SUBMITTED,
+  FRAUD_CHECK_SUBMITTED:           callDynamic_eventype_db_storage_FRAUD_CHECK_SUBMITTED,
+  MANAGER_APPROVAL_SUBMITTED:      callDynamic_eventype_db_storage_MANAGER_APPROVAL_SUBMITTED,
+  EMPLOYMENT_INFO_SUBMITTED:       callDynamic_eventype_db_storage_EMPLOYMENT_INFO_SUBMITTED,
+  SALARY_INFO_SUBMITTED:           callDynamic_eventype_db_storage_SALARY_INFO_SUBMITTED,
+  BUSINESS_INFO_SUBMITTED:         callDynamic_eventype_db_storage_BUSINESS_INFO_SUBMITTED,
 };
 
 async function dispatchEventTypeStorage(eventType, workflowId, formData) {
@@ -262,4 +612,12 @@ module.exports = {
   callDynamic_eventype_db_storage_EMPLOYMENT_INFO_SUBMITTED,
   callDynamic_eventype_db_storage_SALARY_INFO_SUBMITTED,
   callDynamic_eventype_db_storage_BUSINESS_INFO_SUBMITTED,
+  callDynamic_eventype_db_storage_FACE_VERIFICATION_RESULT_SUBMITTED,
+  callDynamic_eventype_db_storage_PAN_VERIFICATION_SUBMITTED,
+  callDynamic_eventype_db_storage_AADHAR_VERIFICATION_SUBMITTED,
+  callDynamic_eventype_db_storage_BANK_DETAILS_SUBMITTED,
+  callDynamic_eventype_db_storage_BANK_ACCOUNT_VERIFICATION_SUBMITTED,
+  callDynamic_eventype_db_storage_BANK_STATEMENT_UPLOAD_SUBMITTED,
+  callDynamic_eventype_db_storage_DOCUMENT_UPLOAD_SUBMITTED,
+  callDynamic_eventype_db_storage_LOAN_CONSENT_SUBMITTED,
 };

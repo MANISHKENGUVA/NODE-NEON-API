@@ -6,31 +6,49 @@ function getFieldValue(context, fieldPath) {
 }
 
 function evaluateCondition(context, condition) {
-  const actual = getFieldValue(context, condition.field);
+  let actual = getFieldValue(context, condition.field);
   const expected = condition.value;
 
+  // Treat null and "" as the same empty value.
+  const isNullOrEmpty = (v) => v === null || v === "";
+  if (isNullOrEmpty(actual) && isNullOrEmpty(expected)) {
+    console.log(`[ruleEngine] ${condition.field} (actual=${JSON.stringify(actual)}) ${condition.operator} ${JSON.stringify(expected)} → true (null/"" match)`);
+    return condition.operator === "=" ? true : false;
+  }
+
+  let result;
   switch (condition.operator) {
     case "=":
-      return actual === expected;
+      result = actual === expected;
+      break;
     case "!=":
-      return actual !== expected;
+      result = actual !== expected;
+      break;
     case ">":
-      return actual > expected;
+      result = actual > expected;
+      break;
     case "<":
-      return actual < expected;
+      result = actual < expected;
+      break;
     case ">=":
-      return actual >= expected;
+      result = actual >= expected;
+      break;
     case "<=":
-      return actual <= expected;
+      result = actual <= expected;
+      break;
     default:
-      return false;
+      result = false;
   }
+
+  console.log(`[ruleEngine] ${condition.field} (actual=${JSON.stringify(actual)}) ${condition.operator} ${JSON.stringify(expected)} → ${result}`);
+  return result;
 }
 
 function evaluateRuleEngine(context, ruleEngine) {
   if (!ruleEngine || !ruleEngine.conditions?.length) {
     return true;
   }
+  console.log("CONTECT" ,JSON.stringify(context,null,2))
 
   const results = ruleEngine.conditions.map((condition) =>
     evaluateCondition(context, condition)
