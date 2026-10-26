@@ -1,10 +1,16 @@
 const express = require("express");
 const { sql } = require("../config/db");
 const workflowRoutes = require("./workflow");
+const sessionRoutes = require("./session");
+const authRoutes = require("./auth");
 const { navigatorHandler } = require("./workflow");
 
 const router = express.Router();
 
+// Session router must be mounted before the general workflow router so
+// /workflow/session/:id is handled by the session controller.
+router.use("/workflow/session", sessionRoutes);
+router.use("/auth", authRoutes);
 router.use("/workflow", workflowRoutes);
 router.post("/workflow-navigator", navigatorHandler);
 

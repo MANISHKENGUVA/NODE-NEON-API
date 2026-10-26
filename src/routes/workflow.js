@@ -4,6 +4,7 @@ const { recordWorkflow, appendWorkflowEvent } = require("../services/workflowRec
 const { decideNextState, workflowDefinition, realdecider } = require("../services/workflowDecider");
 const { navigatorService } = require("../services/navigationservice");
 const { dispatchEventTypeStorage, createDomainDatastoreTable } = require("../services/domainDatastore");
+const { runResolvePipeline, runEventAccessGuard } = require("../access/resolvePipeline");
 const {
   createWorkflowIdentifier,
   getWorkflowIdentifier,
@@ -204,8 +205,54 @@ router.post("/recorder/:id/events", async (req, res, next) => {
 
 router.post("/decider", async (req, res, next) => {
   try {
+    // Session-aware resolve: when a workflow session is supplied the request
+    // runs the full pipeline (session → latest event → rule engine → node →
+    // access resolver). Requests without a session keep the exact legacy
+    // behaviour below.
+    if (req.body?.sessionId) {
+      const { httpStatus, body } = await runResolvePipeline({
+        sessionId: req.body.sessionId,
+        workflowActor: req.body.workflowActor ?? req.body.WORKFLOW_ACTOR,
+        captchaToken: req.body.captchaToken,
+        internalToken: req.get("x-internal-token"),
+        remoteIp: req.ip,
+      });
+      return res.status(httpStatus).json(body);
+    }
+
     const result = await decideNextState(req.body);
     res.json({ success: true, data: result });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * POST /api/workflow/resolve
+ *
+ * The backend-authoritative resolve endpoint:
+ *   1. Validate workflow session
+ *   2. Get latest event for the workflow/session
+ *   3. Evaluate the existing Rule Engine
+ *   4. Resolve the next node (existing algorithm incl. actor fallback)
+ *   5. Load node configuration
+ *   6. Run the Access Resolver
+ *   7. Return node / CAPTCHA_REQUIRED / AUTHENTICATION_REQUIRED /
+ *      ACCESS_DENIED / SESSION_EXPIRED / WORKFLOW_COMPLETED / error
+ *
+ * Body: { sessionId, workflowActor?, captchaToken? }
+ */
+router.post("/resolve", async (req, res, next) => {
+  try {
+    const { sessionId, workflowActor, captchaToken } = req.body ?? {};
+    const { httpStatus, body } = await runResolvePipeline({
+      sessionId,
+      workflowActor,
+      captchaToken,
+      internalToken: req.get("x-internal-token"),
+      remoteIp: req.ip,
+    });
+    res.status(httpStatus).json(body);
   } catch (err) {
     next(err);
   }
@@ -252,12 +299,40 @@ router.post("/workflow-navigator", navigatorHandler);
  *   workflowMetadata.componentViewRenderState — e.g. "BORROWER-DETAILS-V1-PERSONAL-INFO-V1"
  *   formData                                  — submitted form fields for edge evaluation
  */
-router.post("/eventCreaterAndProcesser", async (req, res, next) => {
+/**
+ * Shared event processor used by both event entry points.
+ *
+ * Pipeline:
+ *   0. (when sessionId supplied) session + node access guard
+ *   1. persist formData into the correct domain table
+ *   2. publish event + evaluate edges → next node (existing engine)
+ *
+ * The frontend never chooses the next node — it is always resolved by the
+ * workflow engine / rule engine.
+ */
+async function processWorkflowEvent(req, res, next) {
   try {
-    console.log("[eventCreaterAndProcesser] request.body:", JSON.stringify(req.body, null, 2));
+    const { eventType, workflowMetadata = {}, formData = {}, sessionId, captchaToken } = req.body;
+    const { workflowId: clientWorkflowId, workflowActor: clientActor, componentViewRenderState } =
+      workflowMetadata;
 
-    const { eventType, workflowMetadata = {}, formData = {} } = req.body;
-    const { workflowId, workflowActor, componentViewRenderState } = workflowMetadata;
+    // ── Step 0: session + access guard (skipped for legacy requests) ─────────
+    const guard = await runEventAccessGuard({
+      sessionId,
+      node: componentViewRenderState,
+      captchaToken,
+      internalToken: req.get("x-internal-token"),
+      remoteIp: req.ip,
+    });
+    if (!guard.ok) {
+      return res.status(guard.httpStatus ?? 200).json(guard.body);
+    }
+
+    // Backend is authoritative for the workflow id when a session exists.
+    const workflowId = guard.session ? guard.session.workflow_id : clientWorkflowId;
+    const workflowActor = clientActor ?? guard.session?.workflow_actor;
+
+    console.log("[eventCreaterAndProcesser] request.body:", JSON.stringify(req.body, null, 2));
 
     // ── Step 1: persist formData into the correct domain table ─────────────────
     const domainRecord = await dispatchEventTypeStorage(eventType, workflowId, formData);
@@ -270,9 +345,56 @@ router.post("/eventCreaterAndProcesser", async (req, res, next) => {
       CURRENTCOMPLETEDSTEP: componentViewRenderState,
       formData,
     });
-      // res.status(200).json({ success: true, data: { domainRecord, ...result } });
 
-    res.status(200).json({ success: true, data: {  ...result } });
+    res.status(200).json({ success: true, data: { ...result } });
+  } catch (err) {
+    next(err);
+  }
+}
+
+router.post("/eventCreaterAndProcesser", processWorkflowEvent);
+
+/**
+ * POST /api/workflow/event
+ *
+ * Session-shaped event entry point:
+ *   { sessionId, node, event, data, captchaToken? }
+ *
+ * Adapter onto the existing event pipeline — workflow id comes from the
+ * session (backend authoritative), the completed node is `node`, the event
+ * type is `event`, and form payload is `data`.
+ */
+router.post("/event", async (req, res, next) => {
+  try {
+    const { sessionId, node, event, data, workflowActor, workflowId } = req.body ?? {};
+
+    if (!node || !event) {
+      return res.status(400).json({
+        status: "ERROR",
+        success: false,
+        message: "node and event are required",
+      });
+    }
+    if (!sessionId && !workflowId) {
+      return res.status(400).json({
+        status: "ERROR",
+        success: false,
+        message: "sessionId or workflowId is required",
+      });
+    }
+
+    req.body = {
+      ...req.body,
+      eventType: event,
+      formData: data ?? {},
+      workflowMetadata: {
+        workflowId,
+        workflowActor,
+        componentViewRenderState: node,
+      },
+    };
+
+    return processWorkflowEvent(req, res, next);
   } catch (err) {
     next(err);
   }

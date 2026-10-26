@@ -23,8 +23,14 @@ app.get("/", (req, res) => {
       // appendWorkflowEvent: "POST /api/workflow/recorder/:id/events",
       createWorkIdentifierRecordTable: "POST /api/workflow/createdb",
       workflowEventCreaterAndProcesser:"POST /api/workflow/eventCreaterAndProcesser",
+      workflowEvent: "POST /api/workflow/event",
+      workflowResolve: "POST /api/workflow/resolve",
       workflowDecider: "POST /api/workflow/decider",
       workflowNavigator: "POST /api/workflow/navigator",
+      createWorkflowSession: "POST /api/workflow/session",
+      getWorkflowSession: "GET /api/workflow/session/:sessionId",
+      authChallenge: "POST /api/auth/challenge",
+      authVerify: "POST /api/auth/verify",
     },
   });
 });

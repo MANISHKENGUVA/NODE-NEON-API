@@ -62,6 +62,58 @@ async function initDb() {
       updated_at TIMESTAMPTZ DEFAULT NOW()
     )
   `;
+
+  // ── Workflow session + actor authentication ────────────────────────────────
+  // A workflow session starts ANONYMOUS and may later be associated with an
+  // authenticated actor session. Both have independent expiries.
+  await sql`
+    CREATE TABLE IF NOT EXISTS workflow_sessions (
+      session_id VARCHAR(64) PRIMARY KEY,
+      workflow_id VARCHAR(255) NOT NULL,
+      workflow_actor VARCHAR(100) DEFAULT 'BORROWER',
+      status VARCHAR(40) DEFAULT 'ANONYMOUS',
+      actor_id VARCHAR(100),
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      expires_at TIMESTAMPTZ NOT NULL,
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS actor_sessions (
+      actor_session_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      session_id VARCHAR(64) NOT NULL,
+      actor_id VARCHAR(100) NOT NULL,
+      method VARCHAR(40) NOT NULL,
+      subject_hash VARCHAR(128),
+      verified_at TIMESTAMPTZ DEFAULT NOW(),
+      expires_at TIMESTAMPTZ NOT NULL,
+      status VARCHAR(20) DEFAULT 'ACTIVE',
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `;
+
+  await sql`
+    CREATE INDEX IF NOT EXISTS idx_actor_sessions_session_id
+    ON actor_sessions (session_id)
+  `;
+
+  // Server-issued authentication challenges (OTP style verification).
+  // Only a hash of the code is stored — the code itself never hits the DB.
+  await sql`
+    CREATE TABLE IF NOT EXISTS auth_challenges (
+      challenge_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      session_id VARCHAR(64),
+      method VARCHAR(40) NOT NULL,
+      subject_hash VARCHAR(128),
+      code_hash VARCHAR(128) NOT NULL,
+      attempts INT DEFAULT 0,
+      max_attempts INT DEFAULT 5,
+      consumed_at TIMESTAMPTZ,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      expires_at TIMESTAMPTZ NOT NULL
+    )
+  `;
 }
 
 async function createWorkIdentifierTable() {

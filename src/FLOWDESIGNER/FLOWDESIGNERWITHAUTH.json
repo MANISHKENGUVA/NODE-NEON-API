@@ -1,0 +1,517 @@
+{
+  "workflowId": "LOAN-FLOW-V1",
+  "name": "Loan Application Workflow",
+  "version": 1,
+  "status": "ACTIVE",
+
+  "startState": "BORROWER-DETAILS-V1-PERSONAL-INFO-V1",
+
+  "session": {
+    "workflowSession": {
+      "required": true,
+      "anonymousAllowed": true,
+      "expiry": {
+        "value": 1800,
+        "unit": "SECONDS"
+      }
+    },
+
+    "actorSession": {
+      "required": false,
+      "createdOnAuthentication": true,
+      "expiry": {
+        "value": 900,
+        "unit": "SECONDS"
+      }
+    }
+  },
+
+  "accessPolicy": {
+    "default": {
+      "captcha": {
+        "required": true,
+        "provider": "RECAPTCHA",
+        "when": "ACTOR_SESSION_ABSENT"
+      }
+    },
+
+    "actorSession": {
+      "valid": true
+    }
+  },
+
+  "actors": {
+    "BORROWER": {
+      "authentication": {
+        "required": false,
+        "methods": [
+          "MOBILE_OTP",
+          "AADHAAR"
+        ]
+      }
+    },
+
+    "MANAGER": {
+      "authentication": {
+        "required": true,
+        "methods": [
+          "MOBILE_OTP"
+        ]
+      }
+    },
+
+    "SYSTEM": {
+      "authentication": {
+        "required": false
+      }
+    }
+  },
+
+  "states": {
+
+    "BORROWER-DETAILS-V1-PERSONAL-INFO-V1": {
+      "type": "FORM",
+      "component": "PersonalInfoPage",
+
+      "metadata": {
+        "actor": "BORROWER",
+        "module": "DETAILS-V1",
+        "node": "PERSONAL-INFO-V1"
+      },
+
+      "access": {
+        "type": "PUBLIC"
+      },
+
+      "validation": {
+        "schema": "PersonalInfoSchema",
+        "mode": "ON_SUBMIT"
+      },
+
+      "events": {
+        "onSubmit": "BORROWER-PERSONAL-INFO-SUBMITTED"
+      }
+    },
+
+    "BORROWER-DETAILS-V1-ADDRESS-V1": {
+      "type": "FORM",
+      "component": "AddressPage",
+
+      "metadata": {
+        "actor": "BORROWER",
+        "module": "DETAILS-V1",
+        "node": "ADDRESS-V1"
+      },
+
+      "access": {
+        "type": "PUBLIC"
+      },
+
+      "validation": {
+        "schema": "AddressSchema",
+        "mode": "ON_SUBMIT"
+      },
+
+      "events": {
+        "onSubmit": "BORROWER-ADDRESS-SUBMITTED"
+      }
+    },
+
+    "BORROWER-DETAILS-V1-EMPLOYMENT-V1": {
+      "type": "FORM",
+      "component": "EmploymentPage",
+
+      "metadata": {
+        "actor": "BORROWER",
+        "module": "DETAILS-V1",
+        "node": "EMPLOYMENT-V1"
+      },
+
+      "access": {
+        "type": "PUBLIC"
+      },
+
+      "validation": {
+        "schema": "EmploymentSchema",
+        "mode": "ON_SUBMIT"
+      },
+
+      "events": {
+        "onSubmit": "BORROWER-EMPLOYMENT-SUBMITTED"
+      }
+    },
+
+    "BORROWER-IDENTITY-V1-AADHAAR-VERIFICATION-V1": {
+      "type": "VERIFICATION",
+      "component": "AadhaarVerificationPage",
+
+      "metadata": {
+        "actor": "BORROWER",
+        "module": "IDENTITY-V1",
+        "node": "AADHAAR-VERIFICATION-V1"
+      },
+
+      "access": {
+        "type": "ACTOR",
+
+        "authentication": {
+          "required": true,
+
+          "methods": [
+            "AADHAAR"
+          ],
+
+          "session": {
+            "required": true,
+            "type": "ACTOR"
+          }
+        }
+      },
+
+      "verification": {
+        "type": "IDENTITY",
+        "provider": "AADHAAR"
+      },
+
+      "events": {
+        "onSuccess": "BORROWER-AADHAAR-VERIFIED",
+        "onFailure": "BORROWER-AADHAAR-VERIFICATION-FAILED"
+      }
+    },
+
+    "BORROWER-OFFER-V1-LOAN-OFFER-V1": {
+      "type": "FORM",
+      "component": "LoanOfferPage",
+
+      "metadata": {
+        "actor": "BORROWER",
+        "module": "OFFER-V1",
+        "node": "LOAN-OFFER-V1"
+      },
+
+      "access": {
+        "type": "ACTOR",
+
+        "authentication": {
+          "required": true,
+
+          "methods": [
+            "MOBILE_OTP",
+            "AADHAAR"
+          ],
+
+          "session": {
+            "required": true,
+            "type": "ACTOR"
+          }
+        }
+      },
+
+      "validation": {
+        "schema": "LoanOfferSchema",
+        "mode": "ON_SUBMIT"
+      },
+
+      "events": {
+        "onSubmit": "BORROWER-LOAN-OFFER-ACCEPTED"
+      }
+    },
+
+    "MANAGER-APPROVAL-V1-DISBURSEMENT-REVIEW-V1": {
+      "type": "REVIEW",
+      "component": "DisbursementReviewPage",
+
+      "metadata": {
+        "actor": "MANAGER",
+        "module": "APPROVAL-V1",
+        "node": "DISBURSEMENT-REVIEW-V1"
+      },
+
+      "access": {
+        "type": "ACTOR",
+
+        "authentication": {
+          "required": true,
+
+          "methods": [
+            "MOBILE_OTP"
+          ],
+
+          "session": {
+            "required": true,
+            "type": "ACTOR"
+          }
+        }
+      },
+
+      "events": {
+        "onApprove": "MANAGER-DISBURSEMENT-APPROVED",
+        "onReject": "MANAGER-DISBURSEMENT-REJECTED"
+      }
+    },
+
+    "LOAN-DISBURSEMENT-V1": {
+      "type": "INTERNAL",
+      "component": "DisbursementProcessor",
+
+      "metadata": {
+        "actor": "SYSTEM",
+        "module": "DISBURSEMENT-V1",
+        "node": "DISBURSEMENT-V1"
+      },
+
+      "access": {
+        "type": "INTERNAL"
+      },
+
+      "events": {
+        "onSuccess": "LOAN-DISBURSEMENT-COMPLETED",
+        "onFailure": "LOAN-DISBURSEMENT-FAILED"
+      }
+    },
+
+    "LOAN-COMPLETED-V1": {
+      "type": "SUCCESS",
+      "component": "LoanCompletedPage",
+
+      "metadata": {
+        "actor": "BORROWER",
+        "module": "COMPLETION-V1",
+        "node": "LOAN-COMPLETED-V1"
+      },
+
+      "access": {
+        "type": "ACTOR",
+
+        "authentication": {
+          "required": true,
+          "session": {
+            "required": true,
+            "type": "ACTOR"
+          }
+        }
+      }
+    }
+  },
+
+  "transitions": [
+    {
+      "id": "T-001",
+      "from": "BORROWER-DETAILS-V1-PERSONAL-INFO-V1",
+      "event": "BORROWER-PERSONAL-INFO-SUBMITTED",
+      "to": "BORROWER-DETAILS-V1-ADDRESS-V1"
+    },
+
+    {
+      "id": "T-002",
+      "from": "BORROWER-DETAILS-V1-ADDRESS-V1",
+      "event": "BORROWER-ADDRESS-SUBMITTED",
+      "to": "BORROWER-DETAILS-V1-EMPLOYMENT-V1"
+    },
+
+    {
+      "id": "T-003",
+      "from": "BORROWER-DETAILS-V1-EMPLOYMENT-V1",
+      "event": "BORROWER-EMPLOYMENT-SUBMITTED",
+      "to": "BORROWER-IDENTITY-V1-AADHAAR-VERIFICATION-V1"
+    },
+
+    {
+      "id": "T-004",
+      "from": "BORROWER-IDENTITY-V1-AADHAAR-VERIFICATION-V1",
+      "event": "BORROWER-AADHAAR-VERIFIED",
+      "to": "BORROWER-OFFER-V1-LOAN-OFFER-V1"
+    },
+
+    {
+      "id": "T-005",
+      "from": "BORROWER-OFFER-V1-LOAN-OFFER-V1",
+      "event": "BORROWER-LOAN-OFFER-ACCEPTED",
+      "to": "MANAGER-APPROVAL-V1-DISBURSEMENT-REVIEW-V1"
+    },
+
+    {
+      "id": "T-006",
+      "from": "MANAGER-APPROVAL-V1-DISBURSEMENT-REVIEW-V1",
+      "event": "MANAGER-DISBURSEMENT-APPROVED",
+      "to": "LOAN-DISBURSEMENT-V1"
+    },
+
+    {
+      "id": "T-007",
+      "from": "LOAN-DISBURSEMENT-V1",
+      "event": "LOAN-DISBURSEMENT-COMPLETED",
+      "to": "LOAN-COMPLETED-V1"
+    }
+  ],
+
+  "events": {
+    "BORROWER-PERSONAL-INFO-SUBMITTED": {
+      "actor": "BORROWER",
+      "type": "USER_ACTION",
+      "source": "FRONTEND"
+    },
+
+    "BORROWER-ADDRESS-SUBMITTED": {
+      "actor": "BORROWER",
+      "type": "USER_ACTION",
+      "source": "FRONTEND"
+    },
+
+    "BORROWER-EMPLOYMENT-SUBMITTED": {
+      "actor": "BORROWER",
+      "type": "USER_ACTION",
+      "source": "FRONTEND"
+    },
+
+    "BORROWER-AADHAAR-VERIFIED": {
+      "actor": "BORROWER",
+      "type": "IDENTITY_VERIFICATION",
+      "source": "AUTHENTICATION_SERVICE"
+    },
+
+    "BORROWER-AADHAAR-VERIFICATION-FAILED": {
+      "actor": "BORROWER",
+      "type": "IDENTITY_VERIFICATION_FAILED",
+      "source": "AUTHENTICATION_SERVICE"
+    },
+
+    "BORROWER-LOAN-OFFER-ACCEPTED": {
+      "actor": "BORROWER",
+      "type": "USER_ACTION",
+      "source": "FRONTEND"
+    },
+
+    "MANAGER-DISBURSEMENT-APPROVED": {
+      "actor": "MANAGER",
+      "type": "USER_ACTION",
+      "source": "FRONTEND"
+    },
+
+    "MANAGER-DISBURSEMENT-REJECTED": {
+      "actor": "MANAGER",
+      "type": "USER_ACTION",
+      "source": "FRONTEND"
+    },
+
+    "LOAN-DISBURSEMENT-COMPLETED": {
+      "actor": "SYSTEM",
+      "type": "SYSTEM_ACTION",
+      "source": "BACKEND"
+    },
+
+    "LOAN-DISBURSEMENT-FAILED": {
+      "actor": "SYSTEM",
+      "type": "SYSTEM_ERROR",
+      "source": "BACKEND"
+    }
+  },
+
+  "authentication": {
+    "methods": {
+      "MOBILE_OTP": {
+        "type": "AUTHENTICATION",
+        "provider": "OTP_PROVIDER",
+        "createsActorSession": true
+      },
+
+      "AADHAAR": {
+        "type": "IDENTITY_VERIFICATION",
+        "provider": "AADHAAR_PROVIDER",
+        "createsActorSession": true
+      }
+    }
+  },
+
+  "captcha": {
+    "default": {
+      "enabled": true,
+      "provider": "RECAPTCHA",
+      "condition": "ACTOR_SESSION_ABSENT"
+    },
+
+    "verification": {
+      "performedBy": "BACKEND"
+    }
+  },
+
+  "resolution": {
+    "algorithm": [
+      "GET_LATEST_EVENT",
+      "EVALUATE_RULE_ENGINE",
+      "RESOLVE_EDGE",
+      "RESOLVE_TARGET_NODE",
+      "CHECK_WORKFLOW_SESSION",
+      "CHECK_ACTOR_SESSION",
+      "APPLY_DEFAULT_CAPTCHA",
+      "CHECK_NODE_ACCESS",
+      "RETURN_NODE"
+    ],
+
+    "accessRules": {
+      "actorSessionValid": {
+        "captchaRequired": false
+      },
+
+      "actorSessionAbsent": {
+        "captchaRequired": true
+      },
+
+      "actorSessionExpired": {
+        "captchaRequired": true,
+        "authenticationRequired": true
+      }
+    }
+  },
+
+  "api": {
+    "session": {
+      "create": {
+        "method": "POST",
+        "path": "/workflow/session"
+      }
+    },
+
+    "workflow": {
+      "resolve": {
+        "method": "POST",
+        "path": "/workflow/resolve"
+      },
+
+      "event": {
+        "method": "POST",
+        "path": "/workflow/event"
+      }
+    },
+
+    "captcha": {
+      "verify": {
+        "method": "POST",
+        "path": "/captcha/verify"
+      }
+    },
+
+    "authentication": {
+      "verify": {
+        "method": "POST",
+        "path": "/auth/verify"
+      },
+
+      "session": {
+        "method": "GET",
+        "path": "/auth/session/:sessionId"
+      }
+    }
+  },
+
+  "responseStatuses": {
+    "OK": "Node can be accessed",
+    "CAPTCHA_REQUIRED": "CAPTCHA is required",
+    "AUTHENTICATION_REQUIRED": "Actor authentication is required",
+    "SESSION_EXPIRED": "Workflow session has expired",
+    "ACTOR_SESSION_EXPIRED": "Actor authentication session has expired",
+    "ACCESS_DENIED": "Access denied",
+    "WORKFLOW_COMPLETED": "Workflow completed",
+    "ERROR": "Workflow resolution failed"
+  }
+}

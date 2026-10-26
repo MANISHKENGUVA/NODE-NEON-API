@@ -7,6 +7,9 @@
     "BORROWER-DETAILS-V1-PERSONAL-INFO-V1": {
       "type": "FORM",
       "component": "PersonalInfoPage",
+      "access": {
+        "type": "PUBLIC"
+      },
       "metadata": {
         "actor": "BORROWER",
         "module": "DETAILS",
@@ -66,6 +69,12 @@
     "BORROWER-KYC-V1-KYC-UPLOAD-V1": {
       "type": "FORM",
       "component": "KYCUploadPage",
+      "access": {
+        "type": "PUBLIC",
+        "captcha": {
+          "required": true
+        }
+      },
       "metadata": {
         "actor": "BORROWER",
         "module": "KYC",
@@ -269,6 +278,15 @@
     "BORROWER-KYC-V1-AADHAR-VERIFICATION-V1": {
       "type": "SYSTEM",
       "component": "AadharVerificationEngine",
+      "access": {
+        "type": "ACTOR",
+        "authentication": {
+          "required": true,
+          "methods": [
+            "AADHAAR"
+          ]
+        }
+      },
       "metadata": {
         "actor": "BORROWER",
         "module": "KYC",
@@ -1454,6 +1472,15 @@
     "LENDER-OFFER-V1-LOAN-OFFER-V1": {
       "type": "FORM",
       "component": "LoanOfferPage",
+      "access": {
+        "type": "ACTOR",
+        "authentication": {
+          "required": true,
+          "methods": [
+            "MOBILE_OTP"
+          ]
+        }
+      },
       "metadata": {
         "actor": "LENDER",
         "module": "OFFER",
