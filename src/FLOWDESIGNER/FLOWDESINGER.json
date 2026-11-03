@@ -18,6 +18,19 @@
         "nodeVersion": "V1"
       },
       "edges": {
+        "ED00": {
+          "toState": "BORROWER-STATUS-V1-REJECTED-V1",
+          "ruleEngine": {
+            "type": "AND",
+            "conditions": [
+              {
+                "field": "PERSONALDETAILS.isMinor",
+                "operator": "=",
+                "value": true
+              }
+            ]
+          }
+        },
         "ED01": {
           "toState": "BORROWER-ADDRESS-V1-ADDRESS-INFO-V1",
           "ruleEngine": {

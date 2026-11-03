@@ -1,52 +1,65 @@
-require("dotenv").config();
-const express = require("express");
-const { applyMiddleware } = require("./middleware");
-const { notFound, errorHandler } = require("./middleware/errorHandler");
-const routes = require("./routes");
-const { initDb } = require("./config/db");
-
-const app = express();
-const PORT = process.env.PORT || 3000;
-
-applyMiddleware(app);
-
-app.get("/", (req, res) => {
-  res.json({
-    success: true,
-    message: "Node.js API with Neon PostgreSQL",
-    endpoints: {
-      createWorkflowIdentifier: "POST /api/workflow/identifier",
-      // listWorkflowIdentifiers: "GET /api/workflow/identifiers",
-      // getWorkflowIdentifier: "GET /api/workflow/identifier/:identifier",
-      // updateWorkflowIdentifier: "PATCH /api/workflow/identifier/:identifier",
-      // workflowRecorderDecider: "POST /api/workflow/recorder-decider",
-      // appendWorkflowEvent: "POST /api/workflow/recorder/:id/events",
-      createWorkIdentifierRecordTable: "POST /api/workflow/createdb",
-      workflowEventCreaterAndProcesser:"POST /api/workflow/eventCreaterAndProcesser",
-      workflowEvent: "POST /api/workflow/event",
-      workflowResolve: "POST /api/workflow/resolve",
-      workflowDecider: "POST /api/workflow/decider",
-      workflowNavigator: "POST /api/workflow/navigator",
-      createWorkflowSession: "POST /api/workflow/session",
-      getWorkflowSession: "GET /api/workflow/session/:sessionId",
-      authChallenge: "POST /api/auth/challenge",
-      authVerify: "POST /api/auth/verify",
-    },
-  });
-});
-
-app.use("/api", routes);
-app.use(notFound);
-app.use(errorHandler);
+/**
+ * Process entry point.
+ *
+ * Boot order is deliberate:
+ *   1. validate configuration (fail before touching the database)
+ *   2. validate the step registry against the flow definition (fail before
+ *      serving traffic with a node that has no handler)
+ *   3. optionally apply migrations
+ *   4. confirm the database answers
+ *   5. listen
+ *
+ * Nothing is logged that could contain a secret or personal data.
+ */
+const { config, validateConfig } = require("./config/env");
+const { ping, closePool } = require("./db/pool");
+const { migrateUp } = require("./db/migrate");
+const { assertRegistryComplete } = require("./workflow/stepRegistry");
+const { definition } = require("./workflow/definition");
+const { createApp } = require("./app");
 
 async function start() {
-  await initDb();
-  app.listen(PORT, () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+  validateConfig();
+  assertRegistryComplete();
+
+  if (config.migrations.runOnBoot) {
+    await migrateUp();
+  }
+
+  const databaseOk = await ping();
+  if (!databaseOk) {
+    throw new Error("Database did not answer the startup probe");
+  }
+
+  const app = createApp();
+  const server = app.listen(config.port, () => {
+    console.log(
+      `[start] ${definition.workflowVersion} listening on :${config.port} ` +
+        `(${config.nodeEnv}) docs: /api-docs`
+    );
   });
+
+  const shutdown = (signal) => {
+    console.log(`[stop] ${signal} received, shutting down`);
+    server.close(() => {
+      closePool()
+        .catch((error) => console.error("[stop] pool close failed:", error.message))
+        .finally(() => process.exit(0));
+    });
+    // Do not wait forever for keep-alive connections.
+    setTimeout(() => process.exit(1), 10_000).unref();
+  };
+
+  process.on("SIGINT", () => shutdown("SIGINT"));
+  process.on("SIGTERM", () => shutdown("SIGTERM"));
 }
 
-start().catch((err) => {
-  console.error("Failed to start server:", err);
+start().catch(async (error) => {
+  const detail =
+    error instanceof Error
+      ? error.message || `${error.name}${error.code ? ` (code: ${error.code})` : ""}`
+      : String(error);
+  console.error(`[start] failed: ${detail || "unknown startup error"}`);
+  await closePool().catch(() => {});
   process.exit(1);
 });

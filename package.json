@@ -1,14 +1,25 @@
 {
   "name": "node-neon-api",
   "version": "1.0.0",
-  "description": "Node.js API with Neon PostgreSQL, CORS, and middleware",
+  "description": "Server-authoritative loan origination API on Neon PostgreSQL",
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
-    "test": "node scripts/testSessionAccess.js"
+    "migrate": "node scripts/migrate.js up",
+    "migrate:down": "node scripts/migrate.js down",
+    "migrate:status": "node scripts/migrate.js status",
+    "openapi:check": "node scripts/validate-openapi.js",
+    "smoke": "node scripts/smoke-test.js",
+    "test:session": "node scripts/session-audit-test.js",
+    "test": "node scripts/validate-openapi.js && node scripts/smoke-test.js && node scripts/session-audit-test.js"
   },
-  "keywords": ["express", "neon", "postgresql", "api"],
+  "keywords": [
+    "express",
+    "neon",
+    "postgresql",
+    "api"
+  ],
   "license": "MIT",
   "dependencies": {
     "@neondatabase/serverless": "^0.10.4",
@@ -16,6 +27,9 @@
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
     "helmet": "^8.0.0",
-    "morgan": "^1.10.0"
+    "swagger-ui-express": "^5.0.1"
+  },
+  "devDependencies": {
+    "@apidevtools/swagger-parser": "^13.1.0"
   }
 }
