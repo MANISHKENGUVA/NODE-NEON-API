@@ -16,7 +16,7 @@ const { ping, closePool } = require("./db/pool");
 const { migrateUp } = require("./db/migrate");
 const { assertRegistryComplete } = require("./workflow/stepRegistry");
 const { definition } = require("./workflow/definition");
-const { createApp } = require("./app");
+const app = require("./app");
 
 async function start() {
   validateConfig();
@@ -31,7 +31,6 @@ async function start() {
     throw new Error("Database did not answer the startup probe");
   }
 
-  const app = createApp();
   const server = app.listen(config.port, () => {
     console.log(
       `[start] ${definition.workflowVersion} listening on :${config.port} ` +
