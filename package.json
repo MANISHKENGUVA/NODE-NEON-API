@@ -6,9 +6,9 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
-    "migrate": "node scripts/migrate.js up",
-    "migrate:down": "node scripts/migrate.js down",
-    "migrate:status": "node scripts/migrate.js status",
+    "migrate": "node src/db/migrate.js up",
+    "migrate:down": "node src/db/migrate.js down",
+    "migrate:status": "node src/db/migrate.js status",
     "openapi:check": "node scripts/validate-openapi.js",
     "smoke": "node scripts/smoke-test.js",
     "test:session": "node scripts/session-audit-test.js",

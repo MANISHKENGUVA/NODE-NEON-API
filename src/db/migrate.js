@@ -11,7 +11,7 @@
 const crypto = require("crypto");
 const fs = require("fs/promises");
 const path = require("path");
-const { getPool } = require("./pool");
+const { closePool, getPool } = require("./pool");
 
 const MIGRATIONS_DIR = path.join(__dirname, "migrations");
 
@@ -140,6 +140,34 @@ async function migrationStatus() {
     applied: applied.map((row) => ({ version: row.version, appliedAt: row.applied_at })),
     pending: files.filter((file) => !appliedVersions.has(file)),
   };
+}
+
+async function runCli(command = process.argv[2] || "up") {
+  if (command === "up") {
+    await migrateUp();
+  } else if (command === "down") {
+    await migrateDown();
+  } else if (command === "status") {
+    console.log(JSON.stringify(await migrationStatus(), null, 2));
+  } else {
+    throw new Error(`Unknown migration command '${command}'. Use up, down, or status.`);
+  }
+}
+
+if (require.main === module) {
+  runCli()
+    .catch((error) => {
+      console.error(`[migrate] failed: ${error.message}`);
+      process.exitCode = 1;
+    })
+    .finally(async () => {
+      try {
+        await closePool();
+      } catch (error) {
+        console.error(`[migrate] failed to close database pool: ${error.message}`);
+        process.exitCode = 1;
+      }
+    });
 }
 
 module.exports = { migrateUp, migrateDown, migrationStatus };
