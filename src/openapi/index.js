@@ -13,9 +13,9 @@ const router = express.Router();
 
 router.get("/openapi.json", (req, res) => res.json(document));
 
-router.use(
+router.use("/", swaggerUi.serve);
+router.get(
   "/",
-  swaggerUi.serve,
   swaggerUi.setup(document, {
     customSiteTitle: "Loan Workflow API",
     swaggerOptions: { persistAuthorization: true, displayRequestDuration: true },
