@@ -12,12 +12,12 @@
     "openapi:check": "node scripts/validate-openapi.js",
     "smoke": "node scripts/smoke-test.js",
     "test:session": "node scripts/session-audit-test.js",
-    "test": "node scripts/validate-openapi.js && node scripts/smoke-test.js && node scripts/session-audit-test.js"
+    "test": "node --test test/*.test.js && node scripts/validate-openapi.js && node scripts/smoke-test.js && node scripts/session-audit-test.js",
+    "test:neo4j": "node --test test/neo4j-workflow-events.test.js"
   },
   "keywords": [
     "express",
     "neon",
-    "postgresql",
     "api"
   ],
   "license": "MIT",
@@ -27,6 +27,7 @@
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
     "helmet": "^8.0.0",
+    "neo4j-driver": "^5.28.1",
     "swagger-ui-express": "^5.0.1"
   },
   "devDependencies": {

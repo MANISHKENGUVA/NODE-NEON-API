@@ -1,0 +1,16 @@
+MATCH (w:Workflow {workflowId: $workflowId})
+MERGE (w)-[:HAS_EVENT]->(:WorkflowEvent {
+  eventId: $eventId,
+  workflowId: $workflowId,
+  sequenceNumber: $sequenceNumber,
+  eventType: $eventType,
+  stepNumber: $stepNumber,
+  status: $status,
+  timestamp: datetime($timestamp),
+  payloadJson: $payloadJson,
+  nodeKey: $nodeKey,
+  actor: $actor,
+  fromNode: $fromNode,
+  toNode: $toNode,
+  edgeId: $edgeId
+});
